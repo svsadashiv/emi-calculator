@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMI Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface2: #f2efe9;
+    --border: #e2ddd5;
+    --text: #1a1814;
+    --text-2: #6b6560;
+    --text-3: #a09b94;
+    --accent: #1a1814;
+    --accent-teal: #0f6e56;
+    --accent-teal-light: #e1f5ee;
+    --accent-amber: #ba7517;
+    --accent-amber-light: #faeeda;
+    --accent-red: #a32d2d;
+    --accent-red-light: #fcebeb;
+    --accent-blue: #185fa5;
+    --accent-blue-light: #e6f1fb;
+    --radius: 12px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.8rem;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .logo span {
+    font-style: italic;
+    color: var(--accent-teal);
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+  }
+
+  .card-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.1rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-2);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.01em;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    width: 100%;
+    height: 40px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent-teal);
+    background: var(--surface);
+  }
+
+  .input-prefix {
+    position: relative;
+  }
+
+  .input-prefix span {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-3);
+    font-size: 0.85rem;
+    pointer-events: none;
+  }
+
+  .input-prefix input {
+    padding-left: 1.75rem;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1rem;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 1.1rem;
+  }
+
+  .toggle-label {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .toggle-label small {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-3);
+  }
+
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    cursor: pointer;
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    width: 100%;
+    height: 100%;
+    background: var(--border);
+    border-radius: 11px;
+    transition: background 0.2s;
+  }
+
+  .toggle input:checked + .toggle-track { background: var(--accent-teal); }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+  .gst-block {
+    display: none;
+    animation: slideDown 0.2s ease;
+  }
+
+  .gst-block.active { display: block; }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .btn-primary {
+    width: 100%;
+    height: 44px;
+    background: var(--text);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.02em;
+    margin-top: 0.5rem;
+  }
+
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:active { transform: scale(0.99); }
+
+  .results-panel { display: none; }
+  .results-panel.active { display: block; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    box-shadow: var(--shadow);
+  }
+
+  .metric-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 0.3rem;
+  }
+
+  .metric-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .metric-sub {
+    font-size: 0.72rem;
+    color: var(--text-3);
+    margin-top: 0.2rem;
+  }
+
+  .metric.highlight { background: var(--accent-teal-light); border-color: transparent; }
+  .metric.highlight .metric-value { color: var(--accent-teal); }
+  .metric.highlight .metric-label { color: var(--accent-teal); opacity: 0.7; }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .chart-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .legend {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-2);
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 200px;
+    width: 100%;
+  }
+
+  .schedule-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .schedule-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .schedule-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  .schedule-wrap {
+    overflow-y: auto;
+    max-height: 320px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface2);
+    padding: 0.6rem 1rem;
+    text-align: right;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+
+  thead th:first-child { text-align: left; }
+
+  tbody td {
+    padding: 0.65rem 1rem;
+    text-align: right;
+    color: var(--text);
+    border-bottom: 1px solid var(--surface2);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  tbody td:first-child {
+    text-align: left;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    color: var(--text-2);
+    font-size: 0.82rem;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface2); }
+
+  .td-principal { color: var(--accent-teal) !important; }
+  .td-interest { color: var(--accent-amber) !important; }
+  .td-gst { color: var(--accent-blue) !important; }
+  .td-balance { color: var(--text-3) !important; }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-3);
+  }
+
+  .empty-state .empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.4;
+  }
+
+  .empty-state p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .loan-name-display {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+
+  .saved-loans { margin-top: 1.5rem; }
+
+  .saved-loan-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    gap: 8px;
+  }
+
+  .saved-loan-item:hover {
+    border-color: var(--accent-teal);
+    background: var(--accent-teal-light);
+  }
+
+  .saved-loan-item.active {
+    border-color: var(--accent-teal);
+    background: var(--accent-teal-light);
+  }
+
+  .saved-loan-name {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .saved-loan-emi {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent-teal);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .btn-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    font-size: 1rem;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .btn-del:hover { color: var(--accent-red); }
+
+  .no-loans {
+    font-size: 0.8rem;
+    color: var(--text-3);
+    text-align: center;
+    padding: 1rem;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border);
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  .gst-info {
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+    background: var(--accent-blue-light);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    margin-top: -0.5rem;
+    margin-bottom: 1.1rem;
+    border: 1px solid rgba(24, 95, 165, 0.15);
+  }
+
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">EMI<span>track</span></div>
+    <div class="subtitle">Loan Calculator &amp; Tracker</div>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: Form -->
+    <div>
+      <div class="card">
+        <div class="card-title">Loan Details</div>
+
+        <div class="form-group">
+          <label>Loan Name</label>
+          <input type="text" id="loanName" placeholder="e.g. Home Loan, Car Loan" />
+        </div>
+
+        <div class="two-col">
+          <div class="form-group">
+            <label>Principal Amount</label>
+            <div class="input-prefix">
+              <span>₹</span>
+              <input type="number" id="principal" placeholder="500000" min="1" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Tenure</label>
+            <div style="display:flex;gap:6px">
+              <input type="number" id="tenure" placeholder="12" min="1" style="flex:1" />
+              <select id="tenureUnit" style="width:80px;padding:0 0.4rem">
+                <option value="months">Mo</option>
+                <option value="years">Yr</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Annual Interest Rate (%)</label>
+          <div class="input-prefix">
+            <input type="number" id="rate" placeholder="8.5" step="0.1" min="0" style="padding-left:0.75rem" />
+            <span style="left:auto;right:0.75rem">%</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Start Month</label>
+          <input type="month" id="startMonth" style="padding:0 0.75rem" />
+        </div>
+
+        <!-- GST Toggle -->
+        <div class="toggle-row">
+          <div class="toggle-label">
+            Include GST on Interest
+            <small>18% GST applicable on interest component</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="gstToggle" onchange="toggleGST()" />
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+
+        <div class="gst-block" id="gstBlock">
+          <div class="gst-info">⬤ GST @ 18% will be applied on the interest portion of each EMI. This increases your effective monthly outflow.</div>
+          <div class="form-group">
+            <label>GST Rate (%)</label>
+            <div class="input-prefix">
+              <input type="number" id="gstRate" value="18" min="0" max="28" step="0.5" style="padding-left:0.75rem" />
+              <span style="left:auto;right:0.75rem">%</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-primary" onclick="calculate()">Calculate EMI →</button>
+      </div>
+
+      <!-- Saved Loans -->
+      <div class="saved-loans">
+        <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:0.75rem">Saved Loans</div>
+        <div id="savedLoansList">
+          <div class="no-loans">No loans saved yet. Calculate and they'll appear here.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results -->
+    <div id="resultsPanel" class="results-panel">
+      <!-- Metric Cards -->
+      <div class="metrics-grid">
+        <div class="metric highlight">
+          <div class="metric-label">Monthly EMI</div>
+          <div class="metric-value" id="mEMI">—</div>
+          <div class="metric-sub" id="mEMISub">base EMI</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Total Interest</div>
+          <div class="metric-value" id="mInterest">—</div>
+          <div class="metric-sub" id="mInterestSub">over tenure</div>
+        </div>
+        <div class="metric" id="gstMetric" style="display:none">
+          <div class="metric-label">Total GST</div>
+          <div class="metric-value" id="mGST">—</div>
+          <div class="metric-sub">on interest</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Total Outflow</div>
+          <div class="metric-value" id="mTotal">—</div>
+          <div class="metric-sub">principal + interest + gst</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Effective Rate</div>
+          <div class="metric-value" id="mEffRate">—</div>
+          <div class="metric-sub">annual</div>
+        </div>
+      </div>
+
+      <!-- Breakdown Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Principal vs Interest Breakdown</div>
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#0f6e56"></span>Principal</span>
+            <span><span class="legend-dot" style="background:#ba7517"></span>Interest</span>
+            <span class="legend-gst-item" style="display:none"><span class="legend-dot" style="background:#185fa5"></span>GST</span>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="breakdownChart" role="img" aria-label="Stacked bar chart showing principal, interest and GST breakdown over loan tenure"></canvas>
+        </div>
+      </div>
+
+      <!-- Amortization Table -->
+      <div class="schedule-card">
+        <div class="schedule-header">
+          <div class="schedule-title">Amortization Schedule</div>
+          <div class="badge" id="scheduleBadge">—</div>
+        </div>
+        <div class="schedule-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>EMI</th>
+                <th>Principal</th>
+                <th>Interest</th>
+                <th id="gstCol" style="display:none">GST</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state when no calculation done -->
+    <div id="emptyState" style="display:flex;align-items:center;justify-content:center;min-height:340px">
+      <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <p>Enter your loan details and click<br><strong>Calculate EMI</strong> to see the full breakdown, amortization schedule, and visualisation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let loans = JSON.parse(localStorage.getItem('emiLoans') || '[]');
+  let activeChart = null;
+  let activeLoanId = null;
+
+  const today = new Date();
+  document.getElementById('startMonth').value = today.toISOString().slice(0, 7);
+
+  function fmt(n) {
+    return '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  function fmtShort(n) {
+    if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + 'Cr';
+    if (n >= 1e5) return '₹' + (n / 1e5).toFixed(2) + 'L';
+    return '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  function toggleGST() {
+    const on = document.getElementById('gstToggle').checked;
+    document.getElementById('gstBlock').classList.toggle('active', on);
+  }
+
+  function getMonthLabel(startStr, index) {
+    const [y, m] = startStr.split('-').map(Number);
+    const d = new Date(y, m - 1 + index);
+    return d.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+  }
+
+  function calculate() {
+    const name = document.getElementById('loanName').value.trim() || 'Loan';
+    const P = parseFloat(document.getElementById('principal').value);
+    let n = parseFloat(document.getElementById('tenure').value);
+    const annualRate = parseFloat(document.getElementById('rate').value);
+    const startMonth = document.getElementById('startMonth').value;
+    const gstOn = document.getElementById('gstToggle').checked;
+    const gstRate = parseFloat(document.getElementById('gstRate').value || 18) / 100;
+
+    if (!P || !n || !annualRate) {
+      alert('Please fill in all required loan details.');
+      return;
+    }
+
+    if (document.getElementById('tenureUnit').value === 'years') n = Math.round(n * 12);
+
+    const r = annualRate / 12 / 100;
+    const emi = r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+
+    const schedule = [];
+    let balance = P;
+    let totalInterest = 0, totalGST = 0, totalPrincipal = 0;
+
+    for (let i = 0; i < n; i++) {
+      const interest = balance * r;
+      const principal = emi - interest;
+      const gst = gstOn ? interest * gstRate : 0;
+      const totalPayment = emi + gst;
+      balance -= principal;
+      totalInterest += interest;
+      totalGST += gst;
+      totalPrincipal += principal;
+      schedule.push({
+        month: getMonthLabel(startMonth, i),
+        emi: totalPayment,
+        principal,
+        interest,
+        gst,
+        balance: Math.max(0, balance)
+      });
+    }
+
+    const totalOutflow = totalPrincipal + totalInterest + totalGST;
+    const effectiveAnnualRate = gstOn
+      ? ((totalInterest + totalGST) / P / (n / 12) * 100).toFixed(2)
+      : annualRate.toFixed(2);
+
+    document.getElementById('mEMI').textContent = fmtShort(emi + (gstOn ? schedule[0].gst : 0));
+    document.getElementById('mEMISub').textContent = gstOn ? 'incl. GST' : 'base EMI';
+    document.getElementById('mInterest').textContent = fmtShort(totalInterest);
+    document.getElementById('mInterestSub').textContent = 'over ' + n + ' months';
+    document.getElementById('mGST').textContent = fmtShort(totalGST);
+    document.getElementById('mTotal').textContent = fmtShort(totalOutflow);
+    document.getElementById('mEffRate').textContent = effectiveAnnualRate + '%';
+
+    document.getElementById('gstMetric').style.display = gstOn ? 'block' : 'none';
+    document.getElementById('gstCol').style.display = gstOn ? 'table-cell' : 'none';
+    document.querySelectorAll('.legend-gst-item').forEach(el => el.style.display = gstOn ? 'inline' : 'none');
+
+    document.getElementById('scheduleBadge').textContent = n + ' payments';
+
+    buildTable(schedule, gstOn);
+    buildChart(schedule, gstOn, n);
+
+    document.getElementById('resultsPanel').classList.add('active');
+    document.getElementById('emptyState').style.display = 'none';
+
+    const loanData = { id: Date.now(), name, P, n, annualRate, startMonth, gstOn, gstRate: gstOn ? gstRate * 100 : 18, emi, totalInterest, totalGST, totalOutflow };
+    const existing = loans.findIndex(l => l.name === name);
+    if (existing >= 0) { loans[existing] = { ...loans[existing], ...loanData, id: loans[existing].id }; activeLoanId = loans[existing].id; }
+    else { loans.push(loanData); activeLoanId = loanData.id; }
+    localStorage.setItem('emiLoans', JSON.stringify(loans));
+    renderSavedLoans();
+  }
+
+  function buildTable(schedule, gstOn) {
+    const tbody = document.getElementById('scheduleBody');
+    tbody.innerHTML = '';
+    schedule.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.month}</td>
+        <td>${fmt(row.emi)}</td>
+        <td class="td-principal">${fmt(row.principal)}</td>
+        <td class="td-interest">${fmt(row.interest)}</td>
+        ${gstOn ? `<td class="td-gst">${fmt(row.gst)}</td>` : ''}
+        <td class="td-balance">${fmt(row.balance)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function buildChart(schedule, gstOn, n) {
+    const ctx = document.getElementById('breakdownChart').getContext('2d');
+    if (activeChart) activeChart.destroy();
+
+    const step = n <= 24 ? 1 : n <= 60 ? 3 : 6;
+    const labels = [], principals = [], interests = [], gsts = [];
+
+    for (let i = 0; i < schedule.length; i += step) {
+      labels.push(schedule[i].month);
+      principals.push(Math.round(schedule[i].principal));
+      interests.push(Math.round(schedule[i].interest));
+      gsts.push(Math.round(schedule[i].gst));
+    }
+
+    const datasets = [
+      { label: 'Principal', data: principals, backgroundColor: '#0f6e56', borderWidth: 0 },
+      { label: 'Interest', data: interests, backgroundColor: '#ba7517', borderWidth: 0 },
+    ];
+    if (gstOn) datasets.push({ label: 'GST', data: gsts, backgroundColor: '#185fa5', borderWidth: 0 });
+
+    activeChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: {
+            label: ctx => ' ' + ctx.dataset.label + ': ₹' + ctx.parsed.y.toLocaleString('en-IN')
+          }
+        }},
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, color: '#a09b94', maxRotation: 45 } },
+          y: { stacked: true, grid: { color: '#f2efe9' }, ticks: {
+            font: { size: 10 }, color: '#a09b94',
+            callback: v => v >= 1e5 ? '₹' + (v/1e5).toFixed(1) + 'L' : '₹' + v.toLocaleString('en-IN')
+          }}
+        }
+      }
+    });
+  }
+
+  function renderSavedLoans() {
+    const list = document.getElementById('savedLoansList');
+    if (!loans.length) {
+      list.innerHTML = '<div class="no-loans">No loans saved yet. Calculate and they\'ll appear here.</div>';
+      return;
+    }
+    list.innerHTML = loans.map(l => `
+      <div class="saved-loan-item ${l.id === activeLoanId ? 'active' : ''}" onclick="loadLoan(${l.id})">
+        <div class="saved-loan-name">${l.name}</div>
+        <div class="saved-loan-emi">${fmtShort(l.emi)}/mo</div>
+        <button class="btn-del" onclick="deleteLoan(event, ${l.id})" title="Remove">×</button>
+      </div>
+    `).join('');
+  }
+
+  function loadLoan(id) {
+    const loan = loans.find(l => l.id === id);
+    if (!loan) return;
+    activeLoanId = id;
+    document.getElementById('loanName').value = loan.name;
+    document.getElementById('principal').value = loan.P;
+    document.getElementById('tenure').value = loan.n;
+    document.getElementById('tenureUnit').value = 'months';
+    document.getElementById('rate').value = loan.annualRate;
+    document.getElementById('startMonth').value = loan.startMonth;
+    document.getElementById('gstToggle').checked = loan.gstOn;
+    document.getElementById('gstRate').value = loan.gstRate;
+    document.getElementById('gstBlock').classList.toggle('active', loan.gstOn);
+    renderSavedLoans();
+    calculate();
+  }
+
+  function deleteLoan(e, id) {
+    e.stopPropagation();
+    loans = loans.filter(l => l.id !== id);
+    localStorage.setItem('emiLoans', JSON.stringify(loans));
+    if (activeLoanId === id) {
+      activeLoanId = null;
+      document.getElementById('resultsPanel').classList.remove('active');
+      document.getElementById('emptyState').style.display = 'flex';
+    }
+    renderSavedLoans();
+  }
+
+  renderSavedLoans();
+</script>
+</body>
+</html>
