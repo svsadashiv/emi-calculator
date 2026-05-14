@@ -345,6 +345,43 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .schedule-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-2);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+  }
+
+  .btn-download:hover {
+    border-color: var(--accent-teal);
+    color: var(--accent-teal);
+    background: var(--accent-teal-light);
+  }
+
+  .btn-download svg {
+    flex-shrink: 0;
   }
 
   .schedule-title {
@@ -665,8 +702,20 @@
       <!-- Amortization Table -->
       <div class="schedule-card">
         <div class="schedule-header">
-          <div class="schedule-title">Amortization Schedule</div>
-          <div class="badge" id="scheduleBadge">—</div>
+          <div style="display:flex;align-items:center;gap:0.75rem">
+            <div class="schedule-title">Amortization Schedule</div>
+            <div class="badge" id="scheduleBadge">—</div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn-download" onclick="downloadCSV()" title="Download as CSV">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0-3-3m3 3 3-3M3 13h10"/></svg>
+              CSV
+            </button>
+            <button class="btn-download" onclick="downloadPDF()" title="Download as PDF">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0-3-3m3 3 3-3M3 13h10"/></svg>
+              PDF
+            </button>
+          </div>
         </div>
         <div class="schedule-wrap">
           <table>
@@ -700,6 +749,8 @@
   let loans = JSON.parse(localStorage.getItem('emiLoans') || '[]');
   let activeChart = null;
   let activeLoanId = null;
+  let lastSchedule = [];
+  let lastLoanMeta = {};
 
   const today = new Date();
   document.getElementById('startMonth').value = today.toISOString().slice(0, 7);
@@ -785,6 +836,9 @@
     document.querySelectorAll('.legend-gst-item').forEach(el => el.style.display = gstOn ? 'inline' : 'none');
 
     document.getElementById('scheduleBadge').textContent = n + ' payments';
+
+    lastSchedule = schedule;
+    lastLoanMeta = { name, P, n, annualRate, gstOn, gstRate: gstOn ? gstRate * 100 : 18 };
 
     buildTable(schedule, gstOn);
     buildChart(schedule, gstOn, n);
@@ -901,6 +955,76 @@
       document.getElementById('emptyState').style.display = 'flex';
     }
     renderSavedLoans();
+  }
+
+  function downloadCSV() {
+    if (!lastSchedule.length) return;
+    const { name, P, annualRate, gstOn, gstRate } = lastLoanMeta;
+    const headers = ['Month','EMI (INR)','Principal (INR)','Interest (INR)',...(gstOn?[`GST ${gstRate}% (INR)`]:[]),'Balance (INR)'];
+    const dataRows = lastSchedule.map(r => [
+      r.month, Math.round(r.emi), Math.round(r.principal), Math.round(r.interest),
+      ...(gstOn ? [Math.round(r.gst)] : []), Math.round(r.balance)
+    ]);
+    const tEMI = lastSchedule.reduce((s,r)=>s+r.emi,0);
+    const tPri = lastSchedule.reduce((s,r)=>s+r.principal,0);
+    const tInt = lastSchedule.reduce((s,r)=>s+r.interest,0);
+    const tGST = lastSchedule.reduce((s,r)=>s+r.gst,0);
+    const totals = ['Total',Math.round(tEMI),Math.round(tPri),Math.round(tInt),...(gstOn?[Math.round(tGST)]:[]),0];
+    const lines = [
+      [`Loan: ${name}`], [`Principal: ${Math.round(P)}`], [`Rate: ${annualRate}%`],
+      ...(gstOn?[[`GST: ${gstRate}%`]]:[]), [], headers, ...dataRows, totals
+    ];
+    const csv = lines.map(r => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+    a.download = `${name.replace(/\s+/g,'_')}_amortization.csv`;
+    a.click();
+  }
+
+  function downloadPDF() {
+    if (!lastSchedule.length) return;
+    const { name, P, annualRate, n, gstOn, gstRate } = lastLoanMeta;
+    const tEMI = lastSchedule.reduce((s,r)=>s+r.emi,0);
+    const tPri = lastSchedule.reduce((s,r)=>s+r.principal,0);
+    const tInt = lastSchedule.reduce((s,r)=>s+r.interest,0);
+    const tGST = lastSchedule.reduce((s,r)=>s+r.gst,0);
+    const r2 = n => Math.round(n).toLocaleString('en-IN');
+    const bodyRows = lastSchedule.map((r,i) => `<tr style="background:${i%2===0?'#fff':'#f9f8f5'}">
+      <td>${r.month}</td><td>&#8377;${r2(r.emi)}</td>
+      <td style="color:#0f6e56">&#8377;${r2(r.principal)}</td>
+      <td style="color:#ba7517">&#8377;${r2(r.interest)}</td>
+      ${gstOn?`<td style="color:#185fa5">&#8377;${r2(r.gst)}</td>`:''}
+      <td style="color:#888">&#8377;${r2(r.balance)}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${name} — Amortization</title>
+    <style>body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1814;padding:32px;font-size:12px}
+    h1{font-size:20px;margin:0 0 4px}
+    .meta{color:#888;font-size:11px;margin-bottom:20px}
+    .meta span{margin-right:14px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1a1814;color:#fff;padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+    th:first-child{text-align:left}
+    td{padding:7px 10px;text-align:right;border-bottom:1px solid #f0ede8}
+    td:first-child{text-align:left;font-weight:500}
+    tfoot td{font-weight:600;background:#f2efe9;border-top:2px solid #e2ddd5}
+    .foot{margin-top:20px;color:#aaa;font-size:10px}
+    @media print{body{padding:16px}}</style></head><body>
+    <h1>${name}</h1>
+    <div class="meta">
+      <span>Principal: &#8377;${r2(P)}</span>
+      <span>Rate: ${annualRate}% p.a.</span>
+      <span>Tenure: ${n} months</span>
+      ${gstOn?`<span>GST: ${gstRate}%</span>`:''}
+    </div>
+    <table>
+      <thead><tr><th>Month</th><th>EMI</th><th>Principal</th><th>Interest</th>${gstOn?`<th>GST ${gstRate}%</th>`:''}<th>Balance</th></tr></thead>
+      <tbody>${bodyRows}</tbody>
+      <tfoot><tr><td>Total</td><td>&#8377;${r2(tEMI)}</td><td>&#8377;${r2(tPri)}</td><td>&#8377;${r2(tInt)}</td>${gstOn?`<td>&#8377;${r2(tGST)}</td>`:''}<td>&#8377;0</td></tr></tfoot>
+    </table>
+    <div class="foot">Generated by EMItrack &middot; ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <script>window.onload=()=>window.print()<\/script></body></html>`;
+    const url = URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8;'}));
+    window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url),15000);
   }
 
   renderSavedLoans();
