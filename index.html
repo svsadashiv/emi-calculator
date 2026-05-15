@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EMI Tracker</title>
+<title>EMI Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -560,6 +560,60 @@
     border: 1px solid rgba(24, 95, 165, 0.15);
   }
 
+  /* EMI Type segmented control */
+  .seg-control {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 3px;
+    margin-bottom: 1.1rem;
+  }
+
+  .seg-btn {
+    height: 34px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.01em;
+  }
+
+  .seg-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .rate-info {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    margin-top: -0.5rem;
+    margin-bottom: 1.1rem;
+    border: 1px solid transparent;
+    line-height: 1.5;
+  }
+
+  .rate-info.reducing {
+    color: var(--accent-teal);
+    background: var(--accent-teal-light);
+    border-color: rgba(15,110,86,0.15);
+  }
+
+  .rate-info.flat {
+    color: var(--accent-amber);
+    background: var(--accent-amber-light);
+    border-color: rgba(186,117,23,0.2);
+  }
+
   @media (max-width: 780px) {
     .layout { grid-template-columns: 1fr; }
     .metrics-grid { grid-template-columns: repeat(2, 1fr); }
@@ -569,7 +623,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="logo">EMI<span>track</span></div>
+    <div class="logo">EMI <span>Calculator</span></div>
     <div class="subtitle">Loan Calculator &amp; Tracker</div>
   </header>
 
@@ -615,6 +669,18 @@
         <div class="form-group">
           <label>Start Month</label>
           <input type="month" id="startMonth" style="padding:0 0.75rem" />
+        </div>
+
+        <!-- EMI Type -->
+        <div class="form-group">
+          <label>Interest Method</label>
+          <div class="seg-control">
+            <button class="seg-btn active" id="btnReducing" onclick="setEmiType('reducing')">Reducing Balance</button>
+            <button class="seg-btn" id="btnFlat" onclick="setEmiType('flat')">Flat Rate</button>
+          </div>
+          <div class="rate-info reducing" id="rateInfo">
+            <strong>Reducing Balance:</strong> Interest is charged on the outstanding principal each month. EMI stays constant but interest portion shrinks over time.
+          </div>
         </div>
 
         <!-- GST Toggle -->
@@ -751,6 +817,7 @@
   let activeLoanId = null;
   let lastSchedule = [];
   let lastLoanMeta = {};
+  let emiType = 'reducing'; // 'reducing' | 'flat'
 
   const today = new Date();
   document.getElementById('startMonth').value = today.toISOString().slice(0, 7);
@@ -763,6 +830,20 @@
     if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + 'Cr';
     if (n >= 1e5) return '₹' + (n / 1e5).toFixed(2) + 'L';
     return '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  function setEmiType(type) {
+    emiType = type;
+    document.getElementById('btnReducing').classList.toggle('active', type === 'reducing');
+    document.getElementById('btnFlat').classList.toggle('active', type === 'flat');
+    const info = document.getElementById('rateInfo');
+    if (type === 'reducing') {
+      info.className = 'rate-info reducing';
+      info.innerHTML = '<strong>Reducing Balance:</strong> Interest is charged on the outstanding principal each month. EMI stays constant but interest portion shrinks over time.';
+    } else {
+      info.className = 'rate-info flat';
+      info.innerHTML = '<strong>Flat Rate:</strong> Interest is calculated on the full original principal for every month. EMI and interest are fixed — total interest paid is higher than reducing balance.';
+    }
   }
 
   function toggleGST() {
@@ -793,29 +874,52 @@
     if (document.getElementById('tenureUnit').value === 'years') n = Math.round(n * 12);
 
     const r = annualRate / 12 / 100;
-    const emi = r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-
     const schedule = [];
-    let balance = P;
     let totalInterest = 0, totalGST = 0, totalPrincipal = 0;
+    let emi;
 
-    for (let i = 0; i < n; i++) {
-      const interest = balance * r;
-      const principal = emi - interest;
-      const gst = gstOn ? interest * gstRate : 0;
-      const totalPayment = emi + gst;
-      balance -= principal;
-      totalInterest += interest;
-      totalGST += gst;
-      totalPrincipal += principal;
-      schedule.push({
-        month: getMonthLabel(startMonth, i),
-        emi: totalPayment,
-        principal,
-        interest,
-        gst,
-        balance: Math.max(0, balance)
-      });
+    if (emiType === 'flat') {
+      // Flat rate: interest = P * r each month (constant), principal split = (P/n)
+      const monthlyInterest = P * r;
+      const monthlyPrincipal = P / n;
+      emi = monthlyPrincipal + monthlyInterest;
+      let balance = P;
+      for (let i = 0; i < n; i++) {
+        const gst = gstOn ? monthlyInterest * gstRate : 0;
+        balance -= monthlyPrincipal;
+        totalInterest += monthlyInterest;
+        totalGST += gst;
+        totalPrincipal += monthlyPrincipal;
+        schedule.push({
+          month: getMonthLabel(startMonth, i),
+          emi: emi + gst,
+          principal: monthlyPrincipal,
+          interest: monthlyInterest,
+          gst,
+          balance: Math.max(0, balance)
+        });
+      }
+    } else {
+      // Reducing balance (standard)
+      emi = r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+      let balance = P;
+      for (let i = 0; i < n; i++) {
+        const interest = balance * r;
+        const principal = emi - interest;
+        const gst = gstOn ? interest * gstRate : 0;
+        balance -= principal;
+        totalInterest += interest;
+        totalGST += gst;
+        totalPrincipal += principal;
+        schedule.push({
+          month: getMonthLabel(startMonth, i),
+          emi: emi + gst,
+          principal,
+          interest,
+          gst,
+          balance: Math.max(0, balance)
+        });
+      }
     }
 
     const totalOutflow = totalPrincipal + totalInterest + totalGST;
@@ -823,8 +927,8 @@
       ? ((totalInterest + totalGST) / P / (n / 12) * 100).toFixed(2)
       : annualRate.toFixed(2);
 
-    document.getElementById('mEMI').textContent = fmtShort(emi + (gstOn ? schedule[0].gst : 0));
-    document.getElementById('mEMISub').textContent = gstOn ? 'incl. GST' : 'base EMI';
+    document.getElementById('mEMI').textContent = fmtShort(schedule[0].emi);
+    document.getElementById('mEMISub').textContent = gstOn ? 'incl. GST' : (emiType === 'flat' ? 'flat rate' : 'reducing balance');
     document.getElementById('mInterest').textContent = fmtShort(totalInterest);
     document.getElementById('mInterestSub').textContent = 'over ' + n + ' months';
     document.getElementById('mGST').textContent = fmtShort(totalGST);
@@ -838,7 +942,7 @@
     document.getElementById('scheduleBadge').textContent = n + ' payments';
 
     lastSchedule = schedule;
-    lastLoanMeta = { name, P, n, annualRate, gstOn, gstRate: gstOn ? gstRate * 100 : 18 };
+    lastLoanMeta = { name, P, n, annualRate, emiType, gstOn, gstRate: gstOn ? gstRate * 100 : 18 };
 
     buildTable(schedule, gstOn);
     buildChart(schedule, gstOn, n);
@@ -846,7 +950,7 @@
     document.getElementById('resultsPanel').classList.add('active');
     document.getElementById('emptyState').style.display = 'none';
 
-    const loanData = { id: Date.now(), name, P, n, annualRate, startMonth, gstOn, gstRate: gstOn ? gstRate * 100 : 18, emi, totalInterest, totalGST, totalOutflow };
+    const loanData = { id: Date.now(), name, P, n, annualRate, emiType, startMonth, gstOn, gstRate: gstOn ? gstRate * 100 : 18, emi: schedule[0].emi, totalInterest, totalGST, totalOutflow };
     const existing = loans.findIndex(l => l.name === name);
     if (existing >= 0) { loans[existing] = { ...loans[existing], ...loanData, id: loans[existing].id }; activeLoanId = loans[existing].id; }
     else { loans.push(loanData); activeLoanId = loanData.id; }
@@ -941,6 +1045,7 @@
     document.getElementById('gstToggle').checked = loan.gstOn;
     document.getElementById('gstRate').value = loan.gstRate;
     document.getElementById('gstBlock').classList.toggle('active', loan.gstOn);
+    setEmiType(loan.emiType || 'reducing');
     renderSavedLoans();
     calculate();
   }
@@ -959,7 +1064,7 @@
 
   function downloadCSV() {
     if (!lastSchedule.length) return;
-    const { name, P, annualRate, gstOn, gstRate } = lastLoanMeta;
+    const { name, P, annualRate, emiType: et, gstOn, gstRate } = lastLoanMeta;
     const headers = ['Month','EMI (INR)','Principal (INR)','Interest (INR)',...(gstOn?[`GST ${gstRate}% (INR)`]:[]),'Balance (INR)'];
     const dataRows = lastSchedule.map(r => [
       r.month, Math.round(r.emi), Math.round(r.principal), Math.round(r.interest),
@@ -972,6 +1077,7 @@
     const totals = ['Total',Math.round(tEMI),Math.round(tPri),Math.round(tInt),...(gstOn?[Math.round(tGST)]:[]),0];
     const lines = [
       [`Loan: ${name}`], [`Principal: ${Math.round(P)}`], [`Rate: ${annualRate}%`],
+      [`Method: ${et === 'flat' ? 'Flat Rate' : 'Reducing Balance'}`],
       ...(gstOn?[[`GST: ${gstRate}%`]]:[]), [], headers, ...dataRows, totals
     ];
     const csv = lines.map(r => r.join(',')).join('\n');
@@ -983,7 +1089,7 @@
 
   function downloadPDF() {
     if (!lastSchedule.length) return;
-    const { name, P, annualRate, n, gstOn, gstRate } = lastLoanMeta;
+    const { name, P, annualRate, n, emiType: et, gstOn, gstRate } = lastLoanMeta;
     const tEMI = lastSchedule.reduce((s,r)=>s+r.emi,0);
     const tPri = lastSchedule.reduce((s,r)=>s+r.principal,0);
     const tInt = lastSchedule.reduce((s,r)=>s+r.interest,0);
@@ -1000,6 +1106,7 @@
     h1{font-size:20px;margin:0 0 4px}
     .meta{color:#888;font-size:11px;margin-bottom:20px}
     .meta span{margin-right:14px}
+    .method-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:${et==='flat'?'#faeeda':'#e1f5ee'};color:${et==='flat'?'#ba7517':'#0f6e56'}}
     table{width:100%;border-collapse:collapse}
     th{background:#1a1814;color:#fff;padding:8px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
     th:first-child{text-align:left}
@@ -1008,7 +1115,7 @@
     tfoot td{font-weight:600;background:#f2efe9;border-top:2px solid #e2ddd5}
     .foot{margin-top:20px;color:#aaa;font-size:10px}
     @media print{body{padding:16px}}</style></head><body>
-    <h1>${name}</h1>
+    <h1>${name} &nbsp;<span class="method-badge">${et==='flat'?'Flat Rate':'Reducing Balance'}</span></h1>
     <div class="meta">
       <span>Principal: &#8377;${r2(P)}</span>
       <span>Rate: ${annualRate}% p.a.</span>
@@ -1020,7 +1127,7 @@
       <tbody>${bodyRows}</tbody>
       <tfoot><tr><td>Total</td><td>&#8377;${r2(tEMI)}</td><td>&#8377;${r2(tPri)}</td><td>&#8377;${r2(tInt)}</td>${gstOn?`<td>&#8377;${r2(tGST)}</td>`:''}<td>&#8377;0</td></tr></tfoot>
     </table>
-    <div class="foot">Generated by EMItrack &middot; ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <div class="foot">Generated by EMI Calculator &middot; ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
     <script>window.onload=()=>window.print()<\/script></body></html>`;
     const url = URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8;'}));
     window.open(url,'_blank');
