@@ -1,4 +1,4 @@
-# EMItrack
+# EMI Calculator
 
 A minimalist, single-file web application for calculating, visualising, and tracking loan EMIs — with optional GST on interest.
 
